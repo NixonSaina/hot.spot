@@ -1,6 +1,5 @@
 <!doctype html>
 <html lang="en">
-
 <head>
     <meta charset="utf-8">
     <meta http-equiv="pragma" content="no-cache">
@@ -22,11 +21,56 @@
     </form>
     <script src="/md5.js"></script>
     <script>
+        async function sendOTP(username) {
+            try {
+                // Fetch OTP endpoint (backend endpoint required to handle OTP email sending)
+                const response = await fetch('/send-otp', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username })
+                });
+                const data = await response.json();
+                if (data.success) {
+                    alert('OTP sent to your email address.');
+                    document.getElementById('otp-container').style.display = 'block';
+                } else {
+                    alert('Error sending OTP.');
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                alert('Could not send OTP.');
+            }
+        }
+
         function doLogin() {
             const loginForm = document.login;
-            document.sendin.username.value = loginForm.username.value;
-            document.sendin.password.value = hexMD5('$(chap-id)' + loginForm.password.value + '$(chap-challenge)');
-            document.sendin.submit();
+            const username = loginForm.username.value;
+            const password = hexMD5('$(chap-id)' + loginForm.password.value + '$(chap-challenge)');
+
+            // Check if OTP is visible, meaning this is the second step
+            if (document.getElementById('otp-container').style.display === 'block') {
+                // Validate OTP
+                const otp = loginForm.otp.value;
+                fetch('/verify-otp', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, otp })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        document.sendin.username.value = username;
+                        document.sendin.password.value = password;
+                        document.sendin.submit();
+                    } else {
+                        alert('Invalid OTP');
+                    }
+                });
+            } else {
+                // First step - send OTP
+                sendOTP(username);
+            }
+
             return false;
         }
     </script>
@@ -35,28 +79,14 @@
     <!-- Main login container -->
     <div class="main-container">
         <div class="login-wrapper animated fadeIn">
-            <form name="login" action="$(link-login-only)" method="post" $(if chap-id) onsubmit="return doLogin()" $(endif)>
+            <form name="login" action="#" method="post" onsubmit="return doLogin()">
                 <input type="hidden" name="dst" value="$(link-orig)">
                 <input type="hidden" name="popup" value="true">
                 
-                <!-- SVG Logo -->
-                <svg class="logo" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 174 42">
-                    <path fill="#fff" d="M7.32 13.66L0 41.74 ... (SVG paths omitted for brevity) ..." />
-                </svg>
-
-                <!-- Error and information display -->
-                <p class="info $(if error) alert $(endif)">
-                    $(if error == "")
-                        Please log in to use the internet hotspot service 
-                        $(if trial == 'yes') <br> Free trial available, <a href="$(link-login-only)?dst=$(link-orig-esc)&amp;username=T-$(mac-esc)">click here</a>.
-                    $(endif) $(endif)
-                    $(if error) $(error) $(endif)
-                </p>
-
                 <!-- Username input -->
                 <label>
                     <img class="ico" src="img/user.svg" alt="User Icon">
-                    <input name="username" type="text" value="$(username)" placeholder="Username" required>
+                    <input name="username" type="text" placeholder="Username" required>
                 </label>
 
                 <!-- Password input -->
@@ -64,6 +94,14 @@
                     <img class="ico" src="img/password.svg" alt="Password Icon">
                     <input name="password" type="password" placeholder="Password" required>
                 </label>
+
+                <!-- OTP input (hidden initially) -->
+                <div id="otp-container" style="display: none;">
+                    <label>
+                        <img class="ico" src="img/otp.svg" alt="OTP Icon">
+                        <input name="otp" type="text" placeholder="Enter OTP" required>
+                    </label>
+                </div>
 
                 <!-- Submit button -->
                 <input type="submit" value="Connect">
@@ -73,5 +111,4 @@
     </div>
 
 </body>
-
 </html>
